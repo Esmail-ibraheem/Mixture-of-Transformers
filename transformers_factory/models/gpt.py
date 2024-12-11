@@ -4,9 +4,9 @@ import torch.nn.functional as F
 from typing import Optional, Tuple, Union
 import math
 
-from transformer import Transformer, TransformerConfig
+from base_transformer import BaseTransformer, BaseConfig
 
-class GPTConfig(TransformerConfig):
+class GPTConfig(BaseConfig):
     """Configuration class for GPT model."""
     def __init__(
         self,
@@ -38,18 +38,15 @@ class GPTConfig(TransformerConfig):
         self.eos_token_id = eos_token_id
         self.tie_word_embeddings = tie_word_embeddings
 
-class GPT(nn.Module):
+class GPT(BaseTransformer):
     """GPT language model implementation."""
     
     def __init__(self, config: GPTConfig):
-        super().__init__()
-        self.config = config
-        
-        self.transformer = Transformer(config)
+        super().__init__(config)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         
         if config.tie_word_embeddings:
-            self.lm_head.weight = self.transformer.token_embeddings.weight
+            self.lm_head.weight = self.embeddings.weight
         
         # Initialize weights
         self.apply(self._init_weights)
@@ -106,10 +103,7 @@ class GPT(nn.Module):
         attention_mask = attention_mask * (~causal_mask)
         
         # Get transformer outputs
-        hidden_states = self.transformer(
-            input_ids,
-            mask=attention_mask,
-        )
+        hidden_states = super().forward(input_ids, attention_mask, use_cache=use_cache, past_key_values=past_key_values)
         
         # Project to vocabulary
         logits = self.lm_head(hidden_states)

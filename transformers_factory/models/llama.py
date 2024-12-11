@@ -2,10 +2,11 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
+from base_transformer import BaseTransformer, BaseConfig, BaseAttention, BaseMLP
 from transformer import Transformer, TransformerConfig
 
-class LLaMAConfig(TransformerConfig):
+class LLaMAConfig(BaseConfig):
     """Configuration class for LLaMA model."""
     def __init__(
         self,
@@ -187,63 +188,25 @@ class LLaMAMLP(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
 
-class LLaMABlock(nn.Module):
-    """LLaMA Transformer block."""
-    def __init__(self, config: LLaMAConfig):
-        super().__init__()
-        self.hidden_size = config.hidden_size
-        self.self_attn = LLaMAAttention(config)
-        self.mlp = LLaMAMLP(config)
-        self.input_layernorm = RMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
-        self.post_attention_layernorm = RMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
-
-    def forward(
-        self,
-        hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
-        output_attentions: bool = False,
-        use_cache: bool = False,
-    ) -> Tuple[torch.Tensor, ...]:
-        # Self Attention
-        residual = hidden_states
-        hidden_states = self.input_layernorm(hidden_states)
-        
-        attn_outputs = self.self_attn(
-            hidden_states=hidden_states,
-            attention_mask=attention_mask,
-            past_key_value=past_key_value,
-            output_attentions=output_attentions,
-            use_cache=use_cache,
-        )
-        
-        hidden_states = residual + attn_outputs[0]
-        
-        # MLP
-        residual = hidden_states
-        hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
-        hidden_states = residual + hidden_states
-        
-        outputs = (hidden_states,) + attn_outputs[1:]
-        
-        return outputs
-
-class LLaMA(nn.Module):
+class LLaMA(BaseTransformer):
     """LLaMA model implementation."""
     def __init__(self, config: LLaMAConfig):
-        super().__init__()
-        self.config = config
-        self.vocab_size = config.vocab_size
-        self.hidden_size = config.hidden_size
+        super().__init__(config)
         
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
-        self.layers = nn.ModuleList([LLaMABlock(config) for _ in range(config.num_layers)])
-        self.norm = RMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
+        # Replace standard attention with LLaMA attention in all blocks
+        for block in self.blocks:
+            block.attention = LLaMAAttention(config)
+            block.mlp = LLaMAMLP(config)
+        
+        # Use RMSNorm instead of LayerNorm
+        for block in self.blocks:
+            block.ln1 = RMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
+            block.ln2 = RMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
+        self.ln_f = RMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
         
         # Initialize weights
         self.apply(self._init_weights)
-        
+
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
@@ -261,59 +224,16 @@ class LLaMA(nn.Module):
         output_hidden_states: bool = False,
         use_cache: bool = None,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
-        
-        # Get embeddings
-        hidden_states = self.embed_tokens(input_ids)
-        
-        # Create causal mask if needed
-        if attention_mask is None:
-            attention_mask = torch.ones_like(input_ids)
-        causal_mask = self._prepare_causal_mask(
-            attention_mask.size(1),
-            hidden_states.dtype,
-            hidden_states.device
+        outputs = super().forward(
+            input_ids,
+            attention_mask=attention_mask,
+            past_key_values=past_key_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            use_cache=use_cache
         )
-        attention_mask = attention_mask.unsqueeze(1).unsqueeze(2) * causal_mask
         
-        all_hidden_states = () if output_hidden_states else None
-        all_attentions = () if output_attentions else None
-        next_cache = () if use_cache else None
-        
-        # Forward through layers
-        for i, layer in enumerate(self.layers):
-            if output_hidden_states:
-                all_hidden_states += (hidden_states,)
-                
-            layer_outputs = layer(
-                hidden_states,
-                attention_mask=attention_mask,
-                past_key_value=past_key_values[i] if past_key_values is not None else None,
-                output_attentions=output_attentions,
-                use_cache=use_cache,
-            )
-            
-            hidden_states = layer_outputs[0]
-            
-            if output_attentions:
-                all_attentions += (layer_outputs[1],)
-                
-            if use_cache:
-                next_cache += (layer_outputs[-1],)
-        
-        # Final layer norm
-        hidden_states = self.norm(hidden_states)
-        
-        # Add hidden states if needed
-        if output_hidden_states:
-            all_hidden_states += (hidden_states,)
-            
-        return tuple(v for v in [
-            hidden_states,
-            next_cache,
-            all_hidden_states,
-            all_attentions
-        ] if v is not None)
+        return outputs
 
     def _prepare_causal_mask(
         self,

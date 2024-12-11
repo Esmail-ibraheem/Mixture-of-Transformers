@@ -14,7 +14,7 @@ setup(
     description="A flexible library for building transformer-based language models",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/Esmail-ibraheem/TransformersFactory/tree/main",
+    url="https://github.com/yourusername/transformers_factory",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
