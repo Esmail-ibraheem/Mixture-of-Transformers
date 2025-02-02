@@ -1,4 +1,4 @@
-# DeepTensors
+# DeepTensors-LLMs
 building large language models from the ground up using both cuda and python 
 1- implement neural network from scratch using cuda
 2- implement gpt from scratch using both cuda and python 
