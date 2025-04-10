@@ -1,4 +1,4 @@
-# mixture of Transformers
+# Mixture of Transformers
 ## GPT results about top 10 research papers in llms: 
 
 Here are 10 influential papers that would be great to implement in LLMs and AI, spanning architecture improvements, training optimizations, and novel approaches:
