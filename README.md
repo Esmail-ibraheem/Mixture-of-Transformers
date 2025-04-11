@@ -1,8 +1,9 @@
 # Mixture of Transformers
 
-### MoE architecture vs Dense Architecture
+### MoE Architecture vs Dense Architecture
 
-![MoE_dense](https://github.com/user-attachments/assets/7bed248b-299f-46f7-ab8f-140f216cfd3a)
+
+![MoE_vs_Dense](https://github.com/user-attachments/assets/04600bda-1706-4d06-b8a3-60a93db8bc8f)
 
 
 ### From Dense Architecture to Mixture of Experts models
