@@ -1,4 +1,14 @@
 # Mixture of Transformers
+
+### MoE architecture vs Dense Architecture
+
+![MoE_dense](https://github.com/user-attachments/assets/7bed248b-299f-46f7-ab8f-140f216cfd3a)
+
+
+### From Dense Architecture to Mixture of Experts models
+
+![MoE_transformers](https://github.com/user-attachments/assets/3c3be5c5-6781-46ea-8776-8dc275d97025)
+
 ## GPT results about top 10 research papers in llms: 
 
 Here are 10 influential papers that would be great to implement in LLMs and AI, spanning architecture improvements, training optimizations, and novel approaches:
